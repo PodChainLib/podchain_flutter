@@ -1,0 +1,37 @@
+name: podchain_flutter
+description: >
+  Dart/Flutter mobile library for the PODCHAIN cryptographic proof-of-delivery
+  protocol. Handles ECDSA P-256 key generation, secure key storage, delivery
+  payload construction and signing, and offline queue management.
+version: 1.0.0
+homepage: https://github.com/PodChainLib/podchain_flutter
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # ECDSA P-256 operations via platform-native crypto (BoringSSL on Android,
+  # Apple Security Framework on iOS). Produces IEEE P1363 format signatures
+  # compatible with Bun's Web Crypto API on the server.
+  webcrypto: ^0.5.6
+
+  # Hardware-backed secure storage. Uses Android EncryptedSharedPreferences
+  # (backed by Android Keystore) and iOS Keychain.
+  flutter_secure_storage: ^9.0.0
+
+  # Network connectivity monitoring for the offline queue drain mechanism.
+  connectivity_plus: ^5.0.2
+  crypto: ^3.0.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  mocktail: ^1.0.0
+
+flutter:
+  # No UI assets — this is a pure logic library.
