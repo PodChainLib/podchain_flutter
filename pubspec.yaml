@@ -14,17 +14,16 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # ECDSA P-256 operations via platform-native crypto (BoringSSL on Android,
-  # Apple Security Framework on iOS). Produces IEEE P1363 format signatures
-  # compatible with Bun's Web Crypto API on the server.
-  webcrypto: ^0.5.6
-
   # Hardware-backed secure storage. Uses Android EncryptedSharedPreferences
   # (backed by Android Keystore) and iOS Keychain.
   flutter_secure_storage: ^9.0.0
 
   # Network connectivity monitoring for the offline queue drain mechanism.
   connectivity_plus: ^5.0.2
+
+  # ECDSA P-256 operations via platform-native crypto (BoringSSL on Android,
+  # Apple Security Framework on iOS). Produces IEEE P1363 format signatures
+  # compatible with Bun's Web Crypto API on the server.
   crypto: ^3.0.7
 
 dev_dependencies:
