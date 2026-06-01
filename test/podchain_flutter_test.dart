@@ -145,11 +145,6 @@ void main() {
         signedAt: '2024-11-15T10:00:00.000Z',
       );
 
-      final parsed = Map<String, dynamic>.from(
-        // Simple field presence check
-        {'result': result},
-      );
-
       expect(result, contains('"taskId":"task_test"'));
       expect(result, contains('"riderId":"rider_test"'));
       expect(result, contains('"schemaVersion":"1.0"'));

@@ -12,7 +12,6 @@
 
 import 'types.dart';
 import 'dart:convert';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
@@ -86,10 +85,5 @@ class PayloadBuilder {
     final digest = sha256.convert(utf8.encode(input));
 
     return digest.toString();
-  }
-  // ── Helpers ─────────────────────────────────────────────────────────────────
-
-  static String _bytesToHex(Uint8List bytes) {
-    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
 }

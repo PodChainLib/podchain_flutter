@@ -62,6 +62,12 @@ class PodChainFlutter {
 
   // ── Key Management ──────────────────────────────────────────────────────────
 
+  /// Generates a new P-256 key pair for this device and returns its public JWK.
+  ///
+  /// Throws [PodChainFlutterError] with code `KEY_ALREADY_EXISTS` if a key
+  /// already exists. Call [deleteKey] first when rotating/re-onboarding.
+  Future<Map<String, dynamic>> generateKey() => _keyManager.generateKey();
+
   /// Returns the rider's P-256 public key as a JWK map.
   ///
   /// Generates a new key pair if none exists on this device.
@@ -72,6 +78,9 @@ class PodChainFlutter {
   Future<Map<String, dynamic>> generateOrRetrievePublicKey() async {
     return _keyManager.generateOrRetrievePublicKey();
   }
+
+  /// Returns the stored public key as JWK, or null if no key exists.
+  Future<Map<String, dynamic>?> getPublicKeyJwk() => _keyManager.getPublicKeyJwk();
 
   /// Returns true if a key pair already exists on this device.
   Future<bool> hasKey() => _keyManager.hasKey();
@@ -138,6 +147,11 @@ class PodChainFlutter {
   /// Manually triggers a queue drain attempt.
   /// The queue also drains automatically on connectivity change events.
   Future<List<QueueDrainResult>> drainQueue() => _offlineQueue.drain();
+
+  /// Clears all queued proofs from secure storage.
+  ///
+  /// Intended for administrative reset and integration-test cleanup flows.
+  Future<void> clearQueue() => _offlineQueue.clear();
 
   // ── Self-Verification (testing / diagnostics) ────────────────────────────────
 

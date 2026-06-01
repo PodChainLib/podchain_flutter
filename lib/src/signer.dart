@@ -15,7 +15,6 @@ import 'types.dart';
 
 class Signer {
   final KeyManager _keyManager;
-  final Ecdsa _algorithm = Ecdsa.p256(Sha256());
 
   Signer({required KeyManager keyManager}) : _keyManager = keyManager;
 
@@ -24,9 +23,11 @@ class Signer {
 
     final payloadBytes = PayloadBuilder.canonicalBytes(payload);
 
-    final signature = await _algorithm.sign(
-      payloadBytes,
-      keyPair: keyPair,
+    final signature = await _safeRun(
+      () => _algorithm().sign(
+        payloadBytes,
+        keyPair: keyPair,
+      ),
     );
 
     final encodedSignature = base64Url.encode(signature.bytes).replaceAll('=', '');
@@ -60,12 +61,32 @@ class Signer {
         publicKey: publicKey,
       );
 
-      return _algorithm.verify(
-        payloadBytes,
-        signature: signature,
+      return _safeRun(
+        () => _algorithm().verify(
+          payloadBytes,
+          signature: signature,
+        ),
       );
     } catch (_) {
       return false;
     }
   }
+
+  Future<T> _safeRun<T>(Future<T> Function() operation) async {
+    try {
+      return await operation();
+    } on UnimplementedError {
+      throw const PodChainFlutterError(
+        'CRYPTO_BACKEND_UNAVAILABLE',
+        'ECDSA backend unavailable. Add cryptography_flutter and run flutter clean, flutter pub get, then rebuild.',
+      );
+    } on UnsupportedError {
+      throw const PodChainFlutterError(
+        'CRYPTO_BACKEND_UNAVAILABLE',
+        'ECDSA backend unavailable on this platform/runtime. Rebuild the app with cryptography_flutter enabled.',
+      );
+    }
+  }
+
+  Ecdsa _algorithm() => Ecdsa.p256(Sha256());
 }

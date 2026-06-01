@@ -134,16 +134,28 @@ class OfflineQueue {
 
   void _listenForConnectivity() {
     Connectivity().onConnectivityChanged.listen((result) async {
-      final hasConnectivity =
-          result == ConnectivityResult.mobile ||
-          result == ConnectivityResult.wifi ||
-          result == ConnectivityResult.ethernet ||
-          result == ConnectivityResult.vpn;
+      final hasConnectivity = _hasUsableConnectivity(result);
 
       if (hasConnectivity && !await isEmpty) {
         await drain();
       }
     });
+  }
+
+  bool _hasUsableConnectivity(dynamic result) {
+    final values = result is List<ConnectivityResult>
+        ? result
+        : <ConnectivityResult>[
+            if (result is ConnectivityResult) result,
+          ];
+
+    return values.any(
+      (value) =>
+          value == ConnectivityResult.mobile ||
+          value == ConnectivityResult.wifi ||
+          value == ConnectivityResult.ethernet ||
+          value == ConnectivityResult.vpn,
+    );
   }
 
   // ── Persistence Helpers ─────────────────────────────────────────────────────

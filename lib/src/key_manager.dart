@@ -21,7 +21,6 @@ const _kPublicKeyStorageKey = 'podchain_public_key_p256_xy';
 
 class KeyManager {
   final FlutterSecureStorage _storage;
-  final Ecdsa _algorithm = Ecdsa.p256(Sha256());
 
   KeyManager({FlutterSecureStorage? storage})
       : _storage = storage ??
@@ -48,10 +47,13 @@ class KeyManager {
       );
     }
 
-    final generatedKeyPair = await _algorithm.newKeyPair();
+    final algorithm = _algorithm();
+    final generatedKeyPair = await _safeRun(
+      () => algorithm.newKeyPair(),
+    );
     final keyPair = await generatedKeyPair.extract();
 
-    await _validateKey(keyPair);
+    await _validateKey(keyPair, algorithm);
 
     await _storage.write(
       key: _kPrivateKeyStorageKey,
@@ -149,18 +151,22 @@ class KeyManager {
 
   // ── Key Validation ───────────────────────────────────────────────────────────
 
-  Future<void> _validateKey(EcKeyPairData keyPair) async {
+  Future<void> _validateKey(EcKeyPairData keyPair, Ecdsa algorithm) async {
     const testData = 'PODCHAIN_KEY_VALIDATION_v1.0';
     final testBytes = Uint8List.fromList(utf8.encode(testData));
 
-    final signature = await _algorithm.sign(
-      testBytes,
-      keyPair: keyPair,
+    final signature = await _safeRun(
+      () => algorithm.sign(
+        testBytes,
+        keyPair: keyPair,
+      ),
     );
 
-    final valid = await _algorithm.verify(
-      testBytes,
-      signature: signature,
+    final valid = await _safeRun(
+      () => algorithm.verify(
+        testBytes,
+        signature: signature,
+      ),
     );
 
     if (!valid) {
@@ -170,6 +176,24 @@ class KeyManager {
       );
     }
   }
+
+  Future<T> _safeRun<T>(Future<T> Function() operation) async {
+    try {
+      return await operation();
+    } on UnimplementedError {
+      throw const PodChainFlutterError(
+        'CRYPTO_BACKEND_UNAVAILABLE',
+        'ECDSA backend unavailable. Add cryptography_flutter and run flutter clean, flutter pub get, then rebuild.',
+      );
+    } on UnsupportedError {
+      throw const PodChainFlutterError(
+        'CRYPTO_BACKEND_UNAVAILABLE',
+        'ECDSA backend unavailable on this platform/runtime. Rebuild the app with cryptography_flutter enabled.',
+      );
+    }
+  }
+
+  Ecdsa _algorithm() => Ecdsa.p256(Sha256());
 
   // ── Public Key Export ───────────────────────────────────────────────────────
 
