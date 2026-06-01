@@ -25,6 +25,7 @@ dependencies:
   # Apple Security Framework on iOS). Produces IEEE P1363 format signatures
   # compatible with Bun's Web Crypto API on the server.
   crypto: ^3.0.7
+  cryptography: ^2.9.0
 
 dev_dependencies:
   flutter_test:
