@@ -7,7 +7,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:cryptography/cryptography.dart';
+import 'package:webcrypto/webcrypto.dart';
 
 import 'key_manager.dart';
 import 'payload_builder.dart';
@@ -23,14 +23,14 @@ class Signer {
 
     final payloadBytes = PayloadBuilder.canonicalBytes(payload);
 
-    final signature = await _safeRun(
-      () => _algorithm().sign(
+    final signatureBytes = await _safeRun(
+      () => keyPair.signBytes(
         payloadBytes,
-        keyPair: keyPair,
+        Hash.sha256,
       ),
     );
 
-    final encodedSignature = base64Url.encode(signature.bytes).replaceAll('=', '');
+    final encodedSignature = base64Url.encode(signatureBytes).replaceAll('=', '');
     final canonicalPayload = PayloadBuilder.canonicalSerialise(payload);
 
     return SignedDeliveryProof(
@@ -56,15 +56,11 @@ class Signer {
 
       final payloadBytes = Uint8List.fromList(utf8.encode(proof.payload));
 
-      final signature = Signature(
-        signatureBytes,
-        publicKey: publicKey,
-      );
-
       return _safeRun(
-        () => _algorithm().verify(
+        () => publicKey.verifyBytes(
+          signatureBytes,
           payloadBytes,
-          signature: signature,
+          Hash.sha256,
         ),
       );
     } catch (_) {
@@ -78,15 +74,13 @@ class Signer {
     } on UnimplementedError {
       throw const PodChainFlutterError(
         'CRYPTO_BACKEND_UNAVAILABLE',
-        'ECDSA backend unavailable. Add cryptography_flutter and run flutter clean, flutter pub get, then rebuild.',
+        'ECDSA WebCrypto backend unavailable on this platform/runtime.',
       );
     } on UnsupportedError {
       throw const PodChainFlutterError(
         'CRYPTO_BACKEND_UNAVAILABLE',
-        'ECDSA backend unavailable on this platform/runtime. Rebuild the app with cryptography_flutter enabled.',
+        'ECDSA WebCrypto backend unavailable on this platform/runtime.',
       );
     }
   }
-
-  Ecdsa _algorithm() => Ecdsa.p256(Sha256());
 }

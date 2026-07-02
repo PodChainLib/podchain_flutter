@@ -4,7 +4,7 @@ description: >
   protocol. Handles ECDSA P-256 key generation, secure key storage, delivery
   payload construction and signing, and offline queue management.
 version: 1.0.0
-homepage: https://github.com/PodChainLib/podchain_flutter
+homepage: https://github.com/podchain/podchain_flutter
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -14,25 +14,28 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Hardware-backed secure storage. Uses Android EncryptedSharedPreferences
-  # (backed by Android Keystore) and iOS Keychain.
-  flutter_secure_storage: ^10.3.1
+  # ECDSA P-256 signing and SHA-256 hashing via platform-native crypto.
+  # BoringSSL on Android, Apple Security Framework on iOS.
+  webcrypto: ^0.5.6
 
-  # Network connectivity monitoring for the offline queue drain mechanism.
-  connectivity_plus: ^7.1.1
+  # Hardware-backed secure storage.
+  # Android: EncryptedSharedPreferences (backed by Android Keystore)
+  # iOS: Keychain
+  flutter_secure_storage: ^9.0.0
 
-  # ECDSA P-256 operations via platform-native crypto (BoringSSL on Android,
-  # Apple Security Framework on iOS). Produces IEEE P1363 format signatures
-  # compatible with Bun's Web Crypto API on the server.
-  crypto: ^3.0.7
-  cryptography: ^2.9.0
-  cryptography_flutter: ^2.3.4
+  # Connectivity monitoring for offline queue drain.
+  connectivity_plus: ^5.0.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+  # Required for on-device benchmarking and integration testing.
+  integration_test:
+    sdk: flutter
+
   flutter_lints: ^3.0.0
   mocktail: ^1.0.0
 
 flutter:
-  # No UI assets — this is a pure logic library.
+  # Pure logic library — no UI assets.

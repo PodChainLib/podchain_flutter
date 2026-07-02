@@ -5,19 +5,18 @@
 // key generation, secure storage, export for platform registration, and
 // retrieval for signing operations.
 //
-// Uses package:cryptography instead of package:webcrypto.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:webcrypto/webcrypto.dart';
 
 import 'types.dart';
 
-const _kPrivateKeyStorageKey = 'podchain_private_key_p256_d';
-const _kPublicKeyStorageKey = 'podchain_public_key_p256_xy';
+const _kPrivateKeyStorageKey = 'podchain_private_key_p256_pkcs8';
+const _kPublicKeyStorageKey = 'podchain_public_key_p256_jwk';
 
 class KeyManager {
   final FlutterSecureStorage _storage;
@@ -47,28 +46,32 @@ class KeyManager {
       );
     }
 
-    final algorithm = _algorithm();
     final generatedKeyPair = await _safeRun(
-      () => algorithm.newKeyPair(),
+      () => EcdsaPrivateKey.generateKey(EllipticCurve.p256),
     );
-    final keyPair = await generatedKeyPair.extract();
 
-    await _validateKey(keyPair, algorithm);
+    await _validateKey(generatedKeyPair.privateKey, generatedKeyPair.publicKey);
+
+    final pkcs8 = await _safeRun(
+      () => generatedKeyPair.privateKey.exportPkcs8Key(),
+    );
+    final publicJwk = _normalisePublicJwk(
+      await _safeRun(
+        () => generatedKeyPair.publicKey.exportJsonWebKey(),
+      ),
+    );
 
     await _storage.write(
       key: _kPrivateKeyStorageKey,
-      value: _base64UrlEncodeNoPadding(keyPair.d),
+      value: _base64UrlEncodeNoPadding(pkcs8),
     );
 
     await _storage.write(
       key: _kPublicKeyStorageKey,
-      value: jsonEncode({
-        'x': _base64UrlEncodeNoPadding(keyPair.x),
-        'y': _base64UrlEncodeNoPadding(keyPair.y),
-      }),
+      value: jsonEncode(publicJwk),
     );
 
-    return _publicKeyToJwk(keyPair.publicKey);
+    return publicJwk;
   }
 
   /// Returns true if a key pair is already stored on this device.
@@ -79,23 +82,24 @@ class KeyManager {
 
   /// Returns the stored public key JWK, or null if no key exists.
   Future<Map<String, dynamic>?> getPublicKeyJwk() async {
-    final publicKey = await getPublicKey();
-    if (publicKey == null) return null;
+    final stored = await _storage.read(key: _kPublicKeyStorageKey);
+    if (stored == null) return null;
 
-    return _publicKeyToJwk(publicKey);
+    return _normalisePublicJwk(jsonDecode(stored) as Map<String, dynamic>);
   }
 
   /// Returns the stored public key, or null if no key exists.
-  Future<EcPublicKey?> getPublicKey() async {
+  Future<EcdsaPublicKey?> getPublicKey() async {
     final stored = await _storage.read(key: _kPublicKeyStorageKey);
     if (stored == null) return null;
 
     final publicKeyJson = jsonDecode(stored) as Map<String, dynamic>;
 
-    return EcPublicKey(
-      x: _base64UrlDecodeNoPadding(publicKeyJson['x'] as String),
-      y: _base64UrlDecodeNoPadding(publicKeyJson['y'] as String),
-      type: KeyPairType.p256,
+    return _safeRun(
+      () => EcdsaPublicKey.importJsonWebKey(
+        _normalisePublicJwk(publicKeyJson),
+        EllipticCurve.p256,
+      ),
     );
   }
 
@@ -119,8 +123,8 @@ class KeyManager {
 
   // ── Private Key Retrieval for Signing ───────────────────────────────────────
 
-  /// Loads the stored private key as [EcKeyPairData] ready for signing.
-  Future<EcKeyPairData> loadPrivateKey() async {
+  /// Loads the stored PKCS8 private key ready for signing.
+  Future<EcdsaPrivateKey> loadPrivateKey() async {
     final privateKeyStored = await _storage.read(key: _kPrivateKeyStorageKey);
     final publicKeyStored = await _storage.read(key: _kPublicKeyStorageKey);
 
@@ -131,13 +135,11 @@ class KeyManager {
       );
     }
 
-    final publicKeyJson = jsonDecode(publicKeyStored) as Map<String, dynamic>;
-
-    return EcKeyPairData(
-      d: _base64UrlDecodeNoPadding(privateKeyStored),
-      x: _base64UrlDecodeNoPadding(publicKeyJson['x'] as String),
-      y: _base64UrlDecodeNoPadding(publicKeyJson['y'] as String),
-      type: KeyPairType.p256,
+    return _safeRun(
+      () => EcdsaPrivateKey.importPkcs8Key(
+        _base64UrlDecodeNoPadding(privateKeyStored),
+        EllipticCurve.p256,
+      ),
     );
   }
 
@@ -151,21 +153,25 @@ class KeyManager {
 
   // ── Key Validation ───────────────────────────────────────────────────────────
 
-  Future<void> _validateKey(EcKeyPairData keyPair, Ecdsa algorithm) async {
+  Future<void> _validateKey(
+    EcdsaPrivateKey privateKey,
+    EcdsaPublicKey publicKey,
+  ) async {
     const testData = 'PODCHAIN_KEY_VALIDATION_v1.0';
     final testBytes = Uint8List.fromList(utf8.encode(testData));
 
     final signature = await _safeRun(
-      () => algorithm.sign(
+      () => privateKey.signBytes(
         testBytes,
-        keyPair: keyPair,
+        Hash.sha256,
       ),
     );
 
     final valid = await _safeRun(
-      () => algorithm.verify(
+      () => publicKey.verifyBytes(
+        signature,
         testBytes,
-        signature: signature,
+        Hash.sha256,
       ),
     );
 
@@ -183,26 +189,24 @@ class KeyManager {
     } on UnimplementedError {
       throw const PodChainFlutterError(
         'CRYPTO_BACKEND_UNAVAILABLE',
-        'ECDSA backend unavailable. Add cryptography_flutter and run flutter clean, flutter pub get, then rebuild.',
+        'ECDSA WebCrypto backend unavailable on this platform/runtime.',
       );
     } on UnsupportedError {
       throw const PodChainFlutterError(
         'CRYPTO_BACKEND_UNAVAILABLE',
-        'ECDSA backend unavailable on this platform/runtime. Rebuild the app with cryptography_flutter enabled.',
+        'ECDSA WebCrypto backend unavailable on this platform/runtime.',
       );
     }
   }
 
-  Ecdsa _algorithm() => Ecdsa.p256(Sha256());
-
   // ── Public Key Export ───────────────────────────────────────────────────────
 
-  Map<String, dynamic> _publicKeyToJwk(EcPublicKey publicKey) {
+  Map<String, dynamic> _normalisePublicJwk(Map<String, dynamic> jwk) {
     return {
       'kty': 'EC',
       'crv': 'P-256',
-      'x': _base64UrlEncodeNoPadding(publicKey.x),
-      'y': _base64UrlEncodeNoPadding(publicKey.y),
+      'x': jwk['x'] as String,
+      'y': jwk['y'] as String,
       'ext': true,
       'key_ops': ['verify'],
     };
